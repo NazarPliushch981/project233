@@ -1,236 +1,156 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using Microsoft.EntityFrameworkCore;
+
+public class User
+{
+    public int Id { get; set; }
+
+    [Required]
+    public string Username { get; set; }
+
+    [Required]
+    [EmailAddress]
+    public string Email { get; set; }
+
+    public string Password { get; set; }
+
+    public List<Movie> Movies { get; set; }
+}
+///////////////
+
+public class Movie
+{
+    public int Id { get; set; }
+
+    [Required]
+    [MaxLength(50)]
+    public string Title { get; set; }
+
+    public int Year { get; set; }
+
+    public string Description { get; set; }
+
+    public DateTime CreatedAt { get; set; }
+
+    public int UserId { get; set; }
+
+    public User User { get; set; }
+}///////////////////
+public class MovieContext : DbContext
+{
+    public DbSet<User> Users { get; set; }
+    public DbSet<Movie> Movies { get; set; }
+
+    protected override void OnConfiguring(DbContextOptionsBuilder options)
+    {
+        options.UseSqlServer(
+        @"Server=(localdb)\MSSQLLocalDB;Database=MoviesDB;Trusted_Connection=True;");
+    }
+
+    protected override void OnModelCreating(ModelBuilder model)
+    {
+        model.Entity<User>()
+            .HasIndex(u => u.Username)
+            .IsUnique();
+
+        model.Entity<User>()
+            .HasIndex(u => u.Email)
+            .IsUnique();
+
+        model.Entity<Movie>()
+            .Property(m => m.CreatedAt)
+            .HasDefaultValueSql("GETDATE()");
+
+        model.Entity<Movie>()
+            .HasOne(m => m.User)
+            .WithMany(u => u.Movies)
+            .HasForeignKey(m => m.UserId);
+    }
+}///////////////////
 
 class Program
 {
     static void Main()
     {
-        using var db = new AcademyContext();
+        using var db = new MovieContext();
 
         while (true)
         {
-            Console.WriteLine("\n=== MENU ===");
-            Console.WriteLine("1 - Add Group");
-            Console.WriteLine("2 - Show Groups");
-            Console.WriteLine("3 - Add Student");
-            Console.WriteLine("4 - Show Students");
-            Console.WriteLine("0 - Exit");
+            Console.WriteLine("1 Register user");
+            Console.WriteLine("2 Show users");
+            Console.WriteLine("3 Add movie");
+            Console.WriteLine("4 Show movies");
+            Console.WriteLine("0 Exit");
 
             string choice = Console.ReadLine();
 
-            if (choice == "1")
-                AddGroup(db);
-
-            else if (choice == "2")
-                ShowGroups(db);
-
-            else if (choice == "3")
-                AddStudent(db);
-
-            else if (choice == "4")
-                ShowStudents(db);
-
-            else if (choice == "0")
-                break;
+            if (choice == "1") AddUser(db);
+            else if (choice == "2") ShowUsers(db);
+            else if (choice == "3") AddMovie(db);
+            else if (choice == "4") ShowMovies(db);
+            else if (choice == "0") break;
         }
     }
 
-    static void AddGroup(AcademyContext db)
+    static void AddUser(MovieContext db)
     {
-        Console.Write("Group name: ");
-        string name = Console.ReadLine();
-
-        Group g = new Group();
-        g.Name = name;
-
-        db.Groups.Add(g);
-        db.SaveChanges();
-
-        Console.WriteLine("Group added");
-    }
-
-    static void ShowGroups(AcademyContext db)
-    {
-        var groups = db.Groups.ToList();
-
-        foreach (var g in groups)
-            Console.WriteLine(g.Id + " " + g.Name);
-    }
-
-    static void AddStudent(AcademyContext db)
-    {
-        Console.Write("Student name: ");
-        string name = Console.ReadLine();
+        Console.Write("Username: ");
+        string username = Console.ReadLine();
 
         Console.Write("Email: ");
         string email = Console.ReadLine();
 
-        Console.Write("Group Id: ");
-        int gid = int.Parse(Console.ReadLine());
+        Console.Write("Password: ");
+        string password = Console.ReadLine();
 
-        Student s = new Student();
-        s.Name = name;
-        s.Email = email;
-        s.GroupId = gid;
-        s.Scholarship = 1000;
+        db.Users.Add(new User
+        {
+            Username = username,
+            Email = email,
+            Password = password
+        });
 
-        db.Students.Add(s);
         db.SaveChanges();
-
-        Console.WriteLine("Student added");
     }
 
-    static void ShowStudents(AcademyContext db)
+    static void ShowUsers(MovieContext db)
     {
-        var students = db.Students
-            .Include(s => s.Group)
+        var users = db.Users.ToList();
+
+        foreach (var u in users)
+            Console.WriteLine($"{u.Id} {u.Username} {u.Email}");
+    }
+
+    static void AddMovie(MovieContext db)
+    {
+        Console.Write("Title: ");
+        string title = Console.ReadLine();
+
+        Console.Write("Year: ");
+        int year = int.Parse(Console.ReadLine());
+
+        Console.Write("Description: ");
+        string desc = Console.ReadLine();
+
+        Console.Write("User Id: ");
+        int uid = int.Parse(Console.ReadLine());
+
+        db.Movies.Add(new Movie
+        {
+            Title = title,
+            Year = year,
+            Description = desc,
+            UserId = uid
+        });
+
+        db.SaveChanges();
+    }
+
+    static void ShowMovies(MovieContext db)
+    {
+        var movies = db.Movies
+            .Include(m => m.User)
             .ToList();
 
-        foreach (var s in students)
-            Console.WriteLine(s.Id + " " + s.Name + " " + s.Email + " Group:" + s.Group?.Name);
-    }
-}
-
-public class Group
-{
-    public int Id { get; set; }
-    public string Name { get; set; }
-
-    public List<Student> Students { get; set; }
-}
-
-public class Student
-{
-    public int Id { get; set; }
-
-    public string Name { get; set; }
-
-    public string Email { get; set; }
-
-    public decimal Scholarship { get; set; }
-
-    public int GroupId { get; set; }
-    public Group Group { get; set; }
-
-    public int PassportId { get; set; }
-    public Passport Passport { get; set; }
-}
-
-public class Passport
-{
-    public int Id { get; set; }
-
-    public string Number { get; set; }
-
-    public Student Student { get; set; }
-}
-
-public class Teacher
-{
-    public int Id { get; set; }
-
-    public string Name { get; set; }
-
-    public decimal Salary { get; set; }
-
-    public List<Subject> Subjects { get; set; }
-}
-
-public class Subject
-{
-    public int Id { get; set; }
-
-    public string Name { get; set; }
-
-    public string Description { get; set; }
-
-    public int DepartmentId { get; set; }
-    public Department Department { get; set; }
-
-    public List<Teacher> Teachers { get; set; }
-}
-
-public class Department
-{
-    public int Id { get; set; }
-
-    public string Name { get; set; }
-
-    public List<Subject> Subjects { get; set; }
-}
-
-public class AcademyContext : DbContext
-{
-    public DbSet<Group> Groups { get; set; }
-    public DbSet<Student> Students { get; set; }
-    public DbSet<Passport> Passports { get; set; }
-    public DbSet<Teacher> Teachers { get; set; }
-    public DbSet<Subject> Subjects { get; set; }
-    public DbSet<Department> Departments { get; set; }
-
-    protected override void OnConfiguring(DbContextOptionsBuilder options)
-    {
-        options.UseSqlServer(
-        @"Server=(localdb)\MSSQLLocalDB;Database=AcademyDB;Trusted_Connection=True;");
-    }
-
-    protected override void OnModelCreating(ModelBuilder model)
-    {
-        model.Entity<Group>()
-            .Property(g => g.Name)
-            .HasMaxLength(10)
-            .IsRequired();
-
-        model.Entity<Student>()
-            .Property(s => s.Name)
-            .HasMaxLength(50);
-
-        model.Entity<Student>()
-            .HasIndex(s => s.Email)
-            .IsUnique();
-
-        model.Entity<Student>()
-            .Property(s => s.Scholarship)
-            .HasColumnType("decimal(6,2)");
-
-        model.Entity<Student>()
-            .HasOne(s => s.Group)
-            .WithMany(g => g.Students)
-            .HasForeignKey(s => s.GroupId);
-
-        model.Entity<Student>()
-            .HasOne(s => s.Passport)
-            .WithOne(p => p.Student)
-            .HasForeignKey<Student>(s => s.PassportId);
-
-        model.Entity<Passport>()
-            .Property(p => p.Number)
-            .HasMaxLength(9);
-
-        model.Entity<Teacher>()
-            .Property(t => t.Name)
-            .HasMaxLength(50)
-            .IsRequired();
-
-        model.Entity<Teacher>()
-            .Property(t => t.Salary)
-            .HasColumnType("decimal(8,2)")
-            .HasDefaultValue(25000);
-
-        model.Entity<Subject>()
-            .Property(s => s.Name)
-            .HasMaxLength(50)
-            .IsRequired();
-
-        model.Entity<Subject>()
-            .Property(s => s.Description)
-            .IsRequired(false);
-
-        model.Entity<Department>()
-            .Property(d => d.Name)
-            .HasMaxLength(50)
-            .IsRequired();
+        foreach (var m in movies)
+            Console.WriteLine($"{m.Title} ({m.Year}) added by {m.User?.Username}");
     }
 }
