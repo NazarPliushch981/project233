@@ -1,0 +1,236 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using Microsoft.EntityFrameworkCore;
+
+class Program
+{
+    static void Main()
+    {
+        using var db = new AcademyContext();
+
+        while (true)
+        {
+            Console.WriteLine("\n=== MENU ===");
+            Console.WriteLine("1 - Add Group");
+            Console.WriteLine("2 - Show Groups");
+            Console.WriteLine("3 - Add Student");
+            Console.WriteLine("4 - Show Students");
+            Console.WriteLine("0 - Exit");
+
+            string choice = Console.ReadLine();
+
+            if (choice == "1")
+                AddGroup(db);
+
+            else if (choice == "2")
+                ShowGroups(db);
+
+            else if (choice == "3")
+                AddStudent(db);
+
+            else if (choice == "4")
+                ShowStudents(db);
+
+            else if (choice == "0")
+                break;
+        }
+    }
+
+    static void AddGroup(AcademyContext db)
+    {
+        Console.Write("Group name: ");
+        string name = Console.ReadLine();
+
+        Group g = new Group();
+        g.Name = name;
+
+        db.Groups.Add(g);
+        db.SaveChanges();
+
+        Console.WriteLine("Group added");
+    }
+
+    static void ShowGroups(AcademyContext db)
+    {
+        var groups = db.Groups.ToList();
+
+        foreach (var g in groups)
+            Console.WriteLine(g.Id + " " + g.Name);
+    }
+
+    static void AddStudent(AcademyContext db)
+    {
+        Console.Write("Student name: ");
+        string name = Console.ReadLine();
+
+        Console.Write("Email: ");
+        string email = Console.ReadLine();
+
+        Console.Write("Group Id: ");
+        int gid = int.Parse(Console.ReadLine());
+
+        Student s = new Student();
+        s.Name = name;
+        s.Email = email;
+        s.GroupId = gid;
+        s.Scholarship = 1000;
+
+        db.Students.Add(s);
+        db.SaveChanges();
+
+        Console.WriteLine("Student added");
+    }
+
+    static void ShowStudents(AcademyContext db)
+    {
+        var students = db.Students
+            .Include(s => s.Group)
+            .ToList();
+
+        foreach (var s in students)
+            Console.WriteLine(s.Id + " " + s.Name + " " + s.Email + " Group:" + s.Group?.Name);
+    }
+}
+
+public class Group
+{
+    public int Id { get; set; }
+    public string Name { get; set; }
+
+    public List<Student> Students { get; set; }
+}
+
+public class Student
+{
+    public int Id { get; set; }
+
+    public string Name { get; set; }
+
+    public string Email { get; set; }
+
+    public decimal Scholarship { get; set; }
+
+    public int GroupId { get; set; }
+    public Group Group { get; set; }
+
+    public int PassportId { get; set; }
+    public Passport Passport { get; set; }
+}
+
+public class Passport
+{
+    public int Id { get; set; }
+
+    public string Number { get; set; }
+
+    public Student Student { get; set; }
+}
+
+public class Teacher
+{
+    public int Id { get; set; }
+
+    public string Name { get; set; }
+
+    public decimal Salary { get; set; }
+
+    public List<Subject> Subjects { get; set; }
+}
+
+public class Subject
+{
+    public int Id { get; set; }
+
+    public string Name { get; set; }
+
+    public string Description { get; set; }
+
+    public int DepartmentId { get; set; }
+    public Department Department { get; set; }
+
+    public List<Teacher> Teachers { get; set; }
+}
+
+public class Department
+{
+    public int Id { get; set; }
+
+    public string Name { get; set; }
+
+    public List<Subject> Subjects { get; set; }
+}
+
+public class AcademyContext : DbContext
+{
+    public DbSet<Group> Groups { get; set; }
+    public DbSet<Student> Students { get; set; }
+    public DbSet<Passport> Passports { get; set; }
+    public DbSet<Teacher> Teachers { get; set; }
+    public DbSet<Subject> Subjects { get; set; }
+    public DbSet<Department> Departments { get; set; }
+
+    protected override void OnConfiguring(DbContextOptionsBuilder options)
+    {
+        options.UseSqlServer(
+        @"Server=(localdb)\MSSQLLocalDB;Database=AcademyDB;Trusted_Connection=True;");
+    }
+
+    protected override void OnModelCreating(ModelBuilder model)
+    {
+        model.Entity<Group>()
+            .Property(g => g.Name)
+            .HasMaxLength(10)
+            .IsRequired();
+
+        model.Entity<Student>()
+            .Property(s => s.Name)
+            .HasMaxLength(50);
+
+        model.Entity<Student>()
+            .HasIndex(s => s.Email)
+            .IsUnique();
+
+        model.Entity<Student>()
+            .Property(s => s.Scholarship)
+            .HasColumnType("decimal(6,2)");
+
+        model.Entity<Student>()
+            .HasOne(s => s.Group)
+            .WithMany(g => g.Students)
+            .HasForeignKey(s => s.GroupId);
+
+        model.Entity<Student>()
+            .HasOne(s => s.Passport)
+            .WithOne(p => p.Student)
+            .HasForeignKey<Student>(s => s.PassportId);
+
+        model.Entity<Passport>()
+            .Property(p => p.Number)
+            .HasMaxLength(9);
+
+        model.Entity<Teacher>()
+            .Property(t => t.Name)
+            .HasMaxLength(50)
+            .IsRequired();
+
+        model.Entity<Teacher>()
+            .Property(t => t.Salary)
+            .HasColumnType("decimal(8,2)")
+            .HasDefaultValue(25000);
+
+        model.Entity<Subject>()
+            .Property(s => s.Name)
+            .HasMaxLength(50)
+            .IsRequired();
+
+        model.Entity<Subject>()
+            .Property(s => s.Description)
+            .IsRequired(false);
+
+        model.Entity<Department>()
+            .Property(d => d.Name)
+            .HasMaxLength(50)
+            .IsRequired();
+    }
+}
